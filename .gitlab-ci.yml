@@ -1,0 +1,32 @@
+stages:
+  - build
+  - update_helm_chart
+
+variables: {}
+
+build image:
+  image: docker
+  stage: build
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker build -t $CI_REGISTRY_USER/cirepo:$CI_PIPELINE_ID .
+    - docker push $CI_REGISTRY_USER/cirepo:$CI_PIPELINE_ID
+
+update helm:
+  stage: update_helm_chart
+  image: ubuntu:22.04
+  before_script:
+    - echo ${CI_COMMIT_SHORT_SHA}
+    - apt-get update && apt-get install git -y
+    - git config --global user.email "wailinoo2012@gmail.com"
+    - git config --global user.name $GITLAB_USERNAME
+    - git clone https://${GITLAB_USERNAME}:${MANIFEST_REPO_TOKEN}@gitlab.com/${GITLAB_USERNAME}/cd-manifest-repo.git
+    - cd cd-manifest-repo
+    - ls -lrt
+  script:
+    - sed -i "s|wailinoo/cirepo:[^[:space:]]*|wailinoo/cirepo:${CI_PIPELINE_ID}|g" values.yaml
+    - git add values.yaml
+    - git commit -m "update values.yaml file"
+    - git push -u origin main
